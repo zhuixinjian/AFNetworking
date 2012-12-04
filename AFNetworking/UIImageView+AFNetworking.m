@@ -92,52 +92,56 @@ static char kAFImageRequestOperationObjectKey;
     
     [self setImageWithURLRequest:request placeholderImage:placeholderImage success:nil failure:nil];
 }
-- (void)setImageWithURLRequest:(NSURLRequest *)urlRequest
-              placeholderImage:(UIImage *)placeholderImage
-          smallplaceholderSize:(NSInteger )size
-                       success:(void (^)(NSURLRequest *request, NSHTTPURLResponse *response, UIImage *image))success
-                       failure:(void (^)(NSURLRequest *request, NSHTTPURLResponse *response, NSError *error))failure;
+
+- (void)setImageWithURL:(NSURL *)url
+     checkSmallWithSize:(NSInteger )size
+       placeholderImage:(UIImage *)placeholderImage
 {
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPShouldHandleCookies:NO];
+    [request addValue:@"image/*" forHTTPHeaderField:@"Accept"];
+    
     [self cancelImageRequestOperation];
     
-    UIImage *cachedImage = [[[self class] af_sharedImageCache] cachedImageForRequest:urlRequest];
+    UIImage *cachedImage = [[[self class] af_sharedImageCache] cachedImageForRequest:request];
     if (cachedImage) {
         self.image = cachedImage;
         self.af_imageRequestOperation = nil;
-        
-        if (success) {
-            success(nil, nil, cachedImage);
-        }
-    } else {
-        self.image = placeholderImage;
-        
-        AFImageRequestOperation *requestOperation = [[AFImageRequestOperation alloc] initWithRequest:urlRequest];
-        [requestOperation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
-            if ([[urlRequest URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {
-                if (success) {
-                    success(operation.request, operation.response, responseObject);
-                } else {
-                    self.image = responseObject;
-                }
-                
-                self.af_imageRequestOperation = nil;
-            }
-            
-            [[[self class] af_sharedImageCache] cacheImage:responseObject forRequest:urlRequest];
-        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-            if ([[urlRequest URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {
-                if (failure) {
-                    failure(operation.request, operation.response, error);
-                }
-                
-                self.af_imageRequestOperation = nil;
-            }
-        }];
-        
-        self.af_imageRequestOperation = requestOperation;
-        
-        [[[self class] af_sharedImageRequestOperationQueue] addOperation:self.af_imageRequestOperation];
+        return;
     }
+    
+    NSString* smallUrl = [[self class] picUrlForUrl:[url absoluteString]
+                        length:size
+                          crop:FALSE];
+    NSMutableURLRequest *smallRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:smallUrl]];
+    [smallRequest setHTTPShouldHandleCookies:NO];
+    [smallRequest addValue:@"image/*" forHTTPHeaderField:@"Accept"];
+    cachedImage = [[[self class] af_sharedImageCache] cachedImageForRequest:smallRequest];
+    if (cachedImage) {
+        self.image = cachedImage;
+        self.af_imageRequestOperation = nil;
+        return;
+    }
+    
+    self.image = placeholderImage;
+    
+    AFImageRequestOperation *requestOperation = [[AFImageRequestOperation alloc] initWithRequest:request];
+    [requestOperation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+        if ([[request URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {                
+            self.image = responseObject;
+            self.af_imageRequestOperation = nil;
+        }
+        
+        [[[self class] af_sharedImageCache] cacheImage:responseObject forRequest:request];
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        if ([[request URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {
+            self.af_imageRequestOperation = nil;
+        }
+    }];
+    
+    self.af_imageRequestOperation = requestOperation;
+    
+    [[[self class] af_sharedImageRequestOperationQueue] addOperation:self.af_imageRequestOperation];
 }
 
 - (void)setImageWithURLRequest:(NSURLRequest *)urlRequest 
@@ -190,6 +194,61 @@ static char kAFImageRequestOperationObjectKey;
 - (void)cancelImageRequestOperation {
     [self.af_imageRequestOperation cancel];
     self.af_imageRequestOperation = nil;
+}
+
+#pragma mark -
+#pragma mark url
++ (NSString*)picUrlForUrl:(NSString*)url
+                   length:(NSInteger)length
+                     crop:(BOOL)crop
+{
+	if(url==nil || [url length]<1)
+    {
+		return nil;
+	}
+	
+    url = [url stringByReplacingOccurrencesOfString:@".googleusercontent.com/" withString:@".ggpht.com/"];
+    
+	NSURL* aURL = [NSURL URLWithString:url];
+	if (aURL)
+    {
+		BOOL shouldRewrite = NO;
+		NSString* host = [aURL host];
+		
+        NSRange range3 = [host rangeOfString:@".ggpht.com"];
+        if(range3.location>0 && range3.location!=NSNotFound)
+        {
+            shouldRewrite = YES;
+            url = [[url stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+            url = [url stringByReplacingOccurrencesOfString:@"http:/" withString:@"http://"];
+            url = [url stringByReplacingOccurrencesOfString:@"https:/" withString:@"http://"];
+            //NSLog(@"url:%@", url);
+        }
+		
+		if(shouldRewrite==YES)
+        {
+			NSInteger scale = [[self class] screenScale];
+			if(crop==YES)
+            {
+				return [NSString stringWithFormat:@"%@/s%d-c/", url, (int)(scale*length)];
+			}
+            else
+            {
+				return [NSString stringWithFormat:@"%@/s%d/", url, (int)(scale*length)];
+			}
+		}
+	}
+    
+	return url;
+}
+
++ (NSInteger)screenScale {
+	if ( [[[UIDevice currentDevice] systemVersion] intValue] >= 4 && [[UIScreen mainScreen] respondsToSelector:@selector(scale)] ) {
+		CGFloat scale = [[UIScreen mainScreen] scale];
+		return (int)scale;
+	}
+	
+	return 1;
 }
 
 @end
