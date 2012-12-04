@@ -92,6 +92,53 @@ static char kAFImageRequestOperationObjectKey;
     
     [self setImageWithURLRequest:request placeholderImage:placeholderImage success:nil failure:nil];
 }
+- (void)setImageWithURLRequest:(NSURLRequest *)urlRequest
+              placeholderImage:(UIImage *)placeholderImage
+          smallplaceholderSize:(NSInteger )size
+                       success:(void (^)(NSURLRequest *request, NSHTTPURLResponse *response, UIImage *image))success
+                       failure:(void (^)(NSURLRequest *request, NSHTTPURLResponse *response, NSError *error))failure;
+{
+    [self cancelImageRequestOperation];
+    
+    UIImage *cachedImage = [[[self class] af_sharedImageCache] cachedImageForRequest:urlRequest];
+    if (cachedImage) {
+        self.image = cachedImage;
+        self.af_imageRequestOperation = nil;
+        
+        if (success) {
+            success(nil, nil, cachedImage);
+        }
+    } else {
+        self.image = placeholderImage;
+        
+        AFImageRequestOperation *requestOperation = [[AFImageRequestOperation alloc] initWithRequest:urlRequest];
+        [requestOperation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+            if ([[urlRequest URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {
+                if (success) {
+                    success(operation.request, operation.response, responseObject);
+                } else {
+                    self.image = responseObject;
+                }
+                
+                self.af_imageRequestOperation = nil;
+            }
+            
+            [[[self class] af_sharedImageCache] cacheImage:responseObject forRequest:urlRequest];
+        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+            if ([[urlRequest URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {
+                if (failure) {
+                    failure(operation.request, operation.response, error);
+                }
+                
+                self.af_imageRequestOperation = nil;
+            }
+        }];
+        
+        self.af_imageRequestOperation = requestOperation;
+        
+        [[[self class] af_sharedImageRequestOperationQueue] addOperation:self.af_imageRequestOperation];
+    }
+}
 
 - (void)setImageWithURLRequest:(NSURLRequest *)urlRequest 
               placeholderImage:(UIImage *)placeholderImage 
