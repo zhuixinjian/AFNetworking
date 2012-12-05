@@ -77,10 +77,6 @@
  */
 - (void)cancelImageRequestOperation;
 
-+ (NSString*)picUrlForUrl:(NSString*)url
-                   length:(NSInteger)length
-                     crop:(BOOL)crop;
-+ (NSInteger)screenScale;
 
 @end
 

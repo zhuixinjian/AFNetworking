@@ -110,9 +110,8 @@ static char kAFImageRequestOperationObjectKey;
         return;
     }
     
-    NSString* smallUrl = [[self class] picUrlForUrl:[url absoluteString]
-                        length:size
-                          crop:FALSE];
+    NSString* smallUrl = [[url absoluteString] stringByReplacingOccurrencesOfString:@"s960" withString:@"s320-c"];
+    smallUrl = [[url absoluteString] stringByReplacingOccurrencesOfString:@"s1136" withString:@"s320-c"];
     NSMutableURLRequest *smallRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:smallUrl]];
     [smallRequest setHTTPShouldHandleCookies:NO];
     [smallRequest addValue:@"image/*" forHTTPHeaderField:@"Accept"];
@@ -196,60 +195,6 @@ static char kAFImageRequestOperationObjectKey;
     self.af_imageRequestOperation = nil;
 }
 
-#pragma mark -
-#pragma mark url
-+ (NSString*)picUrlForUrl:(NSString*)url
-                   length:(NSInteger)length
-                     crop:(BOOL)crop
-{
-	if(url==nil || [url length]<1)
-    {
-		return nil;
-	}
-	
-    url = [url stringByReplacingOccurrencesOfString:@".googleusercontent.com/" withString:@".ggpht.com/"];
-    
-	NSURL* aURL = [NSURL URLWithString:url];
-	if (aURL)
-    {
-		BOOL shouldRewrite = NO;
-		NSString* host = [aURL host];
-		
-        NSRange range3 = [host rangeOfString:@".ggpht.com"];
-        if(range3.location>0 && range3.location!=NSNotFound)
-        {
-            shouldRewrite = YES;
-            url = [[url stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
-            url = [url stringByReplacingOccurrencesOfString:@"http:/" withString:@"http://"];
-            url = [url stringByReplacingOccurrencesOfString:@"https:/" withString:@"http://"];
-            //NSLog(@"url:%@", url);
-        }
-		
-		if(shouldRewrite==YES)
-        {
-			NSInteger scale = [[self class] screenScale];
-			if(crop==YES)
-            {
-				return [NSString stringWithFormat:@"%@/s%d-c/", url, (int)(scale*length)];
-			}
-            else
-            {
-				return [NSString stringWithFormat:@"%@/s%d/", url, (int)(scale*length)];
-			}
-		}
-	}
-    
-	return url;
-}
-
-+ (NSInteger)screenScale {
-	if ( [[[UIDevice currentDevice] systemVersion] intValue] >= 4 && [[UIScreen mainScreen] respondsToSelector:@selector(scale)] ) {
-		CGFloat scale = [[UIScreen mainScreen] scale];
-		return (int)scale;
-	}
-	
-	return 1;
-}
 
 @end
 
