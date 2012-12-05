@@ -97,6 +97,7 @@ static char kAFImageRequestOperationObjectKey;
      checkSmallWithSize:(NSInteger )size
        placeholderImage:(UIImage *)placeholderImage
 {
+    self.tag = 0;
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPShouldHandleCookies:NO];
     [request addValue:@"image/*" forHTTPHeaderField:@"Accept"];
@@ -110,8 +111,8 @@ static char kAFImageRequestOperationObjectKey;
         return;
     }
     
-    NSString* smallUrl = [[url absoluteString] stringByReplacingOccurrencesOfString:@"s960" withString:@"s320-c"];
-    smallUrl = [[url absoluteString] stringByReplacingOccurrencesOfString:@"s1136" withString:@"s320-c"];
+    NSString* smallUrl = [[url absoluteString] stringByReplacingOccurrencesOfString:@"s960" withString:@"s320"];
+    smallUrl = [smallUrl stringByReplacingOccurrencesOfString:@"s1136" withString:@"s320"];
     NSMutableURLRequest *smallRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:smallUrl]];
     [smallRequest setHTTPShouldHandleCookies:NO];
     [smallRequest addValue:@"image/*" forHTTPHeaderField:@"Accept"];
@@ -119,6 +120,7 @@ static char kAFImageRequestOperationObjectKey;
     if (cachedImage) {
         self.image = cachedImage;
         self.af_imageRequestOperation = nil;
+        self.tag = 1;
         return;
     }
     
@@ -129,6 +131,7 @@ static char kAFImageRequestOperationObjectKey;
         if ([[request URL] isEqual:[[self.af_imageRequestOperation request] URL]]) {                
             self.image = responseObject;
             self.af_imageRequestOperation = nil;
+            self.tag = 1;
         }
         
         [[[self class] af_sharedImageCache] cacheImage:responseObject forRequest:request];
